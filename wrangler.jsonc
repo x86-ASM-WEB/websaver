@@ -6,7 +6,12 @@
 	"compatibility_flags": [
 		"python_workers"
 	],
+	
 	"observability": {
 		"enabled": true
-	}
+	},
+
+	"assets": {
+    	"directory": "./public"
+  	}
 }
