@@ -1,3 +1,21 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('camera-canvas');
 const ctx = canvas.getContext('2d');
@@ -8,25 +26,33 @@ let animationFrameId = null;
 let capturedBlob = null;
 let isPreviewing = false;
 
+// 1. Request access specifically to the FRONT camera
+navigator.mediaDevices.getUserMedia({
+  video: {
+    facingMode: "user", // Forces front camera
+    width: { ideal: 1280 },
+    height: { ideal: 720 }
+  },
+  audio: false
+})
+.then((stream) => {
+  video.srcObject = stream;
+  video.play();
+})
+.catch((err) => {
+  console.error("Camera access error:", err);
+  alert("Unable to access front camera. Please check permissions.");
+});
 
+// Automatically adjust canvas internal dimensions once video metadata arrives
+video.addEventListener('loadedmetadata', () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  captureBtn.disabled = false;
+  startLiveFeed();
+});
 
-
-
-
-// 1. Request access to camera stream
-navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-  .then((stream) => {
-    video.srcObject = stream;
-    video.play();
-    captureBtn.disabled = false;
-    startLiveFeed();
-  })
-  .catch((err) => {
-    console.error("Camera access error:", err);
-    alert("Unable to access camera. Please allow permissions.");
-  });
-
-// 2. Continuously draw live video stream onto canvas
+// 2. Continuously render video frames onto canvas
 function drawFrame() {
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -50,13 +76,9 @@ function stopLiveFeed() {
 // 3. Handle 'Take Photo' / 'Retake' click
 captureBtn.addEventListener('click', () => {
   if (!isPreviewing) {
-    // Freezes current frame on canvas
     stopLiveFeed();
-    
-    // Draw current frame one last time to fix image in canvas context
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convert frozen canvas to Image Blob
     canvas.toBlob((blob) => {
       capturedBlob = blob;
       isPreviewing = true;
@@ -65,35 +87,41 @@ captureBtn.addEventListener('click', () => {
     }, 'image/jpeg', 0.95);
 
   } else {
-    // If already in preview mode, clicking acts as "Back" to restart camera feed
     capturedBlob = null;
     startLiveFeed();
   }
 });
 
-// 4. Handle 'Save' button click to send photo to backend
+// 4. Send photo and document name to backend
 saveBtn.addEventListener('click', async () => {
   if (!capturedBlob) return;
 
+  const docName = prompt("Enter a name for this document:", "MyDocument");
+  if (!docName) return;
+
+  const cleanName = docName.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+
   const formData = new FormData();
-  formData.append('photo', capturedBlob, 'document.jpg');
+  formData.append('photo', capturedBlob, `${cleanName}.jpg`);
+  formData.append('doc_name', cleanName);
 
   try {
     saveBtn.disabled = true;
     captureBtn.disabled = true;
-    saveBtn.innerText = "Saving...";
+    saveBtn.innerText = "Processing...";
 
     const response = await fetch('/api/upload', {
       method: 'POST',
       body: formData,
     });
 
-    if (response.ok) {
-      alert("Document saved and uploaded successfully!");
-      // Reset back to live stream
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      alert("Extracted Text:\n\n" + (result.extracted_text || "No text detected."));
       startLiveFeed();
     } else {
-      alert("Failed to save document on server.");
+      alert("Error: " + (result.error || "Failed to process photo."));
     }
   } catch (error) {
     console.error("Upload error:", error);
