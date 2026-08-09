@@ -16,11 +16,5 @@
   	},
 	"ai": {
     "binding": "AI"
-  	},
-  	"r2_buckets": [
-  	  {
-  	    "binding": "DOCS_BUCKET",
-  	    "bucket_name": "websaver-docs"
-  	  }
-  	]
+  	}
 }
