@@ -13,15 +13,24 @@
 
 
 
-
 {
-  "name": "websaver",
-  "main": "src/main.py",
-  "compatibility_date": "2026-08-09",
-  "ai": {
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "websaver",
+	"main": "src/main.py",
+	"compatibility_date": "2025-11-02",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	
+	"observability": {
+		"enabled": true
+	},
+
+	"assets": {
+    	"directory": "./public"
+  	},
+	"ai": {
     "binding": "AI"
-  },
-  "assets": {
-    "directory": "./public"
-  }
+  	},
+  
 }
