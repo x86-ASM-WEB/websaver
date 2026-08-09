@@ -16,6 +16,8 @@
 
 
 
+
+
 const video = document.getElementById('webcam');
 const canvas = document.getElementById('camera-canvas');
 const ctx = canvas.getContext('2d');
@@ -26,14 +28,19 @@ let animationFrameId = null;
 let capturedBlob = null;
 let isPreviewing = false;
 
-// 1. Request access specifically to the FRONT camera
+// 1. Request access specifically to the REAR / DOCUMENT camera
 navigator.mediaDevices.getUserMedia({
   video: {
-    facingMode: "user", // Forces front camera
-    width: { ideal: 1280 },
-    height: { ideal: 720 }
+    facingMode: { exact: "environment" } // Forces back camera (document camera)
   },
   audio: false
+})
+.catch(() => {
+  // Fallback if 'exact' is not strictly supported by the browser
+  return navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" },
+    audio: false
+  });
 })
 .then((stream) => {
   video.srcObject = stream;
@@ -41,10 +48,10 @@ navigator.mediaDevices.getUserMedia({
 })
 .catch((err) => {
   console.error("Camera access error:", err);
-  alert("Unable to access front camera. Please check permissions.");
+  alert("Unable to access the back camera. Please ensure camera permissions are allowed.");
 });
 
-// Automatically adjust canvas internal dimensions once video metadata arrives
+// Automatically adjust canvas dimensions to match actual camera output ratio
 video.addEventListener('loadedmetadata', () => {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -52,7 +59,7 @@ video.addEventListener('loadedmetadata', () => {
   startLiveFeed();
 });
 
-// 2. Continuously render video frames onto canvas
+// 2. Continuous drawing loop
 function drawFrame() {
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -73,7 +80,7 @@ function stopLiveFeed() {
   }
 }
 
-// 3. Handle 'Take Photo' / 'Retake' click
+// 3. Take Photo / Retake Logic
 captureBtn.addEventListener('click', () => {
   if (!isPreviewing) {
     stopLiveFeed();
@@ -92,13 +99,20 @@ captureBtn.addEventListener('click', () => {
   }
 });
 
-// 4. Send photo and document name to backend
+// 4. Ask for document name and upload to backend
 saveBtn.addEventListener('click', async () => {
   if (!capturedBlob) return;
 
-  const docName = prompt("Enter a name for this document:", "MyDocument");
-  if (!docName) return;
+  // Prompt the user for a document name
+  const docName = prompt("Enter a name for this document:", "My_Document");
+  
+  // Exit if user cancels or enters an empty name
+  if (!docName || docName.trim() === "") {
+    alert("Document name is required to save.");
+    return;
+  }
 
+  // Clean filename (remove special characters and spaces)
   const cleanName = docName.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
 
   const formData = new FormData();
@@ -118,7 +132,7 @@ saveBtn.addEventListener('click', async () => {
     const result = await response.json();
 
     if (response.ok && result.success) {
-      alert("Extracted Text:\n\n" + (result.extracted_text || "No text detected."));
+      alert(`Saved as: ${result.filename || cleanName + '.txt'}\n\nExtracted Text:\n\n` + (result.extracted_text || "No text detected."));
       startLiveFeed();
     } else {
       alert("Error: " + (result.error || "Failed to process photo."));
